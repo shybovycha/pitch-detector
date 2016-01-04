@@ -90,10 +90,16 @@ class GenreDetector:
         lengths = [len(d) for d in self.X]
         self.min_length, self.max_length = min(lengths), max(lengths)
 
-        # fill smaller data chunks with zeros
+        threshold = 879480755.510798
+
+        # fill smaller data chunks with zeros and
+        # filter FFT data so small values are treated as zero
         self.X = np.array([np.hstack((x, np.zeros(self.max_length - len(x)))) for x in self.X])
+
+        medians = np.median(np.array(self.X))
+        print('medians:', medians)
+
         self.X = self.X.reshape((-1, 1, self.max_length))
-        self.X = (self.X * 1000).astype(np.uint64)
 
         self.Y = np.array(self.Y)
 
@@ -153,7 +159,7 @@ class GenreDetector:
             update=nesterov_momentum,
             update_learning_rate=0.1,
             update_momentum=0.9,
-            max_epochs=500,
+            max_epochs=150,
             verbose=1,
         )
 
