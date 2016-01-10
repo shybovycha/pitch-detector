@@ -25,6 +25,21 @@ class GenreDetector:
 
     def run(self):
         self.get_network()
+        self.recognize_test_data()
+
+    def recognize_test_data(self):
+        test_data_path = 'test_data/*.wav'
+        test_files = glob.glob(test_data_path)
+        self.max_length = 84200
+
+        for f in test_files:
+            print('Processing {0}...'.format(f))
+
+            chunk = self.get_wave_data(f)
+            chunk = np.hstack((chunk, np.zeros(self.max_length - len(chunk)))).reshape((1, 1, -1))
+
+            predicted_genre = self.net.predict(chunk)
+            print('{0} is probably {1} (probability: {2})'.format(f, self.genres[int(predicted_genre)], predicted_genre))
 
     def get_wave_data(self, file_path):
         with wave.open(file_path, 'rb') as wf:
@@ -66,6 +81,8 @@ class GenreDetector:
             genre_path = 'songs/{0}/*.wav'.format(genre)
             self.files += [[f, genre_idx] for f in glob.iglob(genre_path)]
 
+        np.random.shuffle(self.files)
+
     def get_song_data(self, pair):
         filename, genre_idx = pair
 
@@ -90,7 +107,7 @@ class GenreDetector:
         lengths = [len(d) for d in self.X]
         self.min_length, self.max_length = min(lengths), max(lengths)
 
-        threshold = 879480755.510798
+        # threshold = 879480755.510798
 
         # fill smaller data chunks with zeros and
         # filter FFT data so small values are treated as zero
@@ -179,8 +196,10 @@ class GenreDetector:
 
     def get_network(self):
         if isfile(self.network_filename):
+            print('Loading network...')
             self.load_network()
         else:
+            print('Generating network...')
             self.get_training_data()
             self.train_network()
 
