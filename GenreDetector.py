@@ -186,7 +186,7 @@ class GenreDetector:
             update=nesterov_momentum,
             update_learning_rate=0.1,
             update_momentum=0.6,
-            max_epochs=5000,
+            max_epochs=1150,
             verbose=1,
         )
 
