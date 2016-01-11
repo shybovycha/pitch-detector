@@ -30,13 +30,15 @@ class GenreDetector:
     def recognize_test_data(self):
         test_data_path = 'test_data/*.wav'
         test_files = glob.glob(test_data_path)
-        self.max_length = 84200
+
+        if self.min_length < 1 or self.max_length < 1:
+            self.min_length = self.max_length = 18800
 
         for f in test_files:
             print('Processing {0}...'.format(f))
 
             chunk = self.get_wave_data(f)
-            chunk = np.hstack((chunk, np.zeros(self.max_length - len(chunk)))).reshape((1, 1, -1))
+            chunk = chunk[:self.min_length].reshape((1, 1, -1))
 
             predicted_genre = self.net.predict(chunk)
             print('{0} is probably {1} (probability: {2})'.format(f, self.genres[int(predicted_genre)], predicted_genre))
@@ -81,6 +83,7 @@ class GenreDetector:
             genre_path = 'songs/{0}/*.wav'.format(genre)
             self.files += [[f, genre_idx] for f in glob.iglob(genre_path)]
 
+        self.files = np.array(self.files)
         np.random.shuffle(self.files)
 
     def get_song_data(self, pair):
@@ -95,13 +98,21 @@ class GenreDetector:
         self.X = self.load_from_file(self.dataset_x_filename)
         self.Y = self.load_from_file(self.dataset_y_filename)
 
-        if isinstance(self.Y[0], str):
-            self.Y = [self.genres.index(y) for y in self.Y]
+        #if isinstance(self.Y[0], str):
+        #    self.Y = [self.genres.index(y) for y in self.Y]
+
+        self.Y = [int(y) for y in self.Y]
 
         self.X = np.array(self.X)
         self.Y = np.array(self.Y)
 
-        self.normalize_dataset()
+        self.max_length = self.X.shape[2]
+        self.min_length = self.X.shape[2]
+
+        if self.min_length < 1 or self.max_length < 1:
+            self.min_length = self.max_length = 18800
+
+        # self.normalize_dataset()
 
     def normalize_dataset(self):
         lengths = [len(d) for d in self.X]
@@ -111,20 +122,19 @@ class GenreDetector:
 
         # fill smaller data chunks with zeros and
         # filter FFT data so small values are treated as zero
-        self.X = np.array([np.hstack((x, np.zeros(self.max_length - len(x)))) for x in self.X])
+        self.X = np.array([x[:self.min_length] for x in self.X])
 
-        medians = np.median(np.array(self.X))
-        print('medians:', medians)
+        # medians = np.median(np.array(self.X))
+        # print('medians:', medians)
 
-        self.X = self.X.reshape((-1, 1, self.max_length))
-
+        self.X = self.X.reshape((-1, 1, self.min_length))
         self.Y = np.array(self.Y)
 
     def create_training_data(self):
-        input_files = self.find_songs()
+        self.find_songs()
 
-        for i, pair in enumerate(input_files):
-            print('>> Loading file {0} ({1} / {2})'.format(pair[0], i, len(input_files)))
+        for i, pair in enumerate(self.files):
+            print('>> Loading file {0} ({1} / {2})'.format(pair[0], i, len(self.files)))
             self.get_song_data(pair)
 
         self.normalize_dataset()
@@ -148,35 +158,35 @@ class GenreDetector:
                     ('output', layers.DenseLayer),
                     ],
             # input layer
-            input_shape=(None, 1, self.max_length),
+            input_shape=(None, 1, self.min_length),
             # layer conv2d1
-            conv1d1_num_filters=25,
+            conv1d1_num_filters=50,
             conv1d1_filter_size=10,
             conv1d1_nonlinearity=lasagne.nonlinearities.rectify,
             conv1d1_W=lasagne.init.GlorotUniform(),
             # layer maxpool1
-            maxpool1_pool_size=25,
+            maxpool1_pool_size=75,
             # layer conv2d2
-            conv1d2_num_filters=25,
-            conv1d2_filter_size=100,
-            conv1d2_nonlinearity=lasagne.nonlinearities.rectify,
+            conv1d2_num_filters=40,
+            conv1d2_filter_size=5,
+            conv1d2_nonlinearity=lasagne.nonlinearities.sigmoid, # rectify,
             # layer maxpool2
-            maxpool2_pool_size=25,
+            maxpool2_pool_size=50,
             # dropout1
-            dropout1_p=0.5,
+            dropout1_p=0.05,
             # dense
-            dense_num_units=25,
-            dense_nonlinearity=lasagne.nonlinearities.rectify,
+            dense_num_units=75,
+            dense_nonlinearity=lasagne.nonlinearities.tanh, #rectify,
             # dropout2
-            dropout2_p=0.5,
+            dropout2_p=0.05,
             # output
             output_nonlinearity=lasagne.nonlinearities.softmax,
             output_num_units=len(self.genres),
             # optimization method params
             update=nesterov_momentum,
             update_learning_rate=0.1,
-            update_momentum=0.9,
-            max_epochs=150,
+            update_momentum=0.6,
+            max_epochs=5000,
             verbose=1,
         )
 

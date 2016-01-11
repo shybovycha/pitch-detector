@@ -4,7 +4,7 @@
 
 *Requirements:*
 
-* numpy
+* pip
 * python 2.6+
 
 You can install dependencies with Pip:
